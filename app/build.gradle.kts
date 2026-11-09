@@ -71,6 +71,7 @@ dependencies {
     implementation(libs.media3.effect)
     implementation(libs.media3.common)
     implementation(libs.androidx.exifinterface)
+    implementation(libs.supra)
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

@@ -11,36 +11,23 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,25 +35,36 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.core.content.ContextCompat
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hoker.anonymizer.R
 import com.hoker.anonymizer.domain.model.ExportStage
 import com.hoker.anonymizer.domain.model.GlitchParams
 import com.hoker.anonymizer.domain.model.MediaKind
 import com.hoker.anonymizer.domain.model.VoiceStyle
-import com.hoker.anonymizer.ui.theme.AnonymizerTheme
+import com.hoker.supra.presentation.buttons.SupraButtonTone
+import com.hoker.supra.presentation.buttons.SupraHardwareButton
+import com.hoker.supra.presentation.fx.glitchEffect
+import com.hoker.supra.presentation.indicators.IndeterminateLoadingIndicator
+import com.hoker.supra.presentation.pickers.SupraDropdownPicker
+import com.hoker.supra.presentation.scaffolds.SupraScaffold
+import com.hoker.supra.presentation.sizes.Sizes
+import com.hoker.supra.presentation.surfaces.SupraCollapsibleArea
+import com.hoker.supra.presentation.text.SupraBodyTextMedium
+import com.hoker.supra.presentation.text.SupraBodyTextSmall
+import com.hoker.supra.presentation.text.SupraDisplayBlock
+import com.hoker.supra.presentation.theme.Ink4
+import com.hoker.supra.presentation.theme.Ink5
 import kotlin.math.roundToInt
 
 /** Everything the editor screen can ask the ViewModel to do. */
@@ -89,9 +87,11 @@ data class EditorActions(
 @Composable
 fun EditorRoute(viewModel: EditorViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
+    val supraFX = viewModel.supraFX
 
+    // Messages go through SupraFX: the scaffold shows them as Supra snackbars, and saves and
+    // failures also get Supra's success/error sound, haptic and colour pulse.
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             val message = when (event) {
@@ -103,8 +103,21 @@ fun EditorRoute(viewModel: EditorViewModel = hiltViewModel()) {
                 EditorEvent.Unsupported -> R.string.message_unsupported
                 EditorEvent.NoAudio -> R.string.message_no_audio
             }
-            snackbarHostState.showSnackbar(resources.getString(message))
+            when (event) {
+                EditorEvent.PhotoSaved, EditorEvent.VideoSaved -> supraFX.success()
+                EditorEvent.SaveFailed, EditorEvent.ExportFailed -> supraFX.error()
+                else -> Unit
+            }
+            supraFX.showSnackbar(resources.getString(message))
         }
+    }
+
+    // While an export runs and the app is on screen, don't let the display time out. Exports keep
+    // going with the screen off too (the service holds a wake lock); this is so progress stays visible.
+    val view = LocalView.current
+    DisposableEffect(state.isExporting) {
+        view.keepScreenOn = state.isExporting
+        onDispose { view.keepScreenOn = false }
     }
 
     // Ask once for notification permission so export progress can show after leaving the app.
@@ -127,7 +140,6 @@ fun EditorRoute(viewModel: EditorViewModel = hiltViewModel()) {
 
     EditorScreen(
         state = state,
-        snackbarHostState = snackbarHostState,
         actions = EditorActions(
             onPickMedia = { picker.launch(PickVisualMediaRequest(PickVisualMedia.ImageAndVideo)) },
             onParamsChange = viewModel::onParamsChange,
@@ -146,40 +158,56 @@ fun EditorRoute(viewModel: EditorViewModel = hiltViewModel()) {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditorScreen(
-    state: EditorUiState,
-    snackbarHostState: SnackbarHostState,
-    actions: EditorActions,
-) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.app_name)) },
-                actions = {
-                    if (state.hasMedia) {
-                        TextButton(onClick = actions.onPickMedia, enabled = !state.isExporting) {
-                            Text(stringResource(R.string.editor_open))
-                        }
-                    }
-                },
-            )
+fun EditorScreen(state: EditorUiState, actions: EditorActions) {
+    val context = LocalContext.current
+    val versionName = remember { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }
+    val glitchColors = remember { listOf(Color.Cyan, Color.Magenta, Color.Yellow) }
+
+    SupraScaffold(
+        // The whole screen glitches each time a new photo or video comes in.
+        modifier = Modifier.glitchEffect(key = state.mediaGeneration, glitchColors = glitchColors, slices = 40),
+        title = stringResource(R.string.app_name),
+        readout = if (state.hasMedia) null to stringResource(R.string.readout_faces, state.faceCount) else null,
+        rail = true,
+        // Live magnetometer reading along the bottom-left rail.
+        railMeter = true,
+        railStamp = stringResource(R.string.rail_stamp, versionName),
+        topBar = if (state.hasMedia) {
+            {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Sizes.small),
+                ) {
+                    StatusLine(state.faceCount, state.kind, modifier = Modifier.weight(1f))
+                    SupraHardwareButton(
+                        text = stringResource(R.string.editor_open),
+                        tone = SupraButtonTone.QUIET,
+                        enabled = !state.isExporting,
+                        onClick = actions.onPickMedia,
+                    )
+                }
+            }
+        } else {
+            null
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+        bottomBar = {
+            val export = state.export
+            when {
+                export != null -> ExportProgressBar(export, actions.onCancelExport)
+                state.hasMedia -> BottomButtons(state, actions)
+            }
+        },
+    ) { modifier ->
+        Box(modifier = modifier.fillMaxSize()) {
             val original = state.original
             when {
                 original != null -> EditorContent(state, original, actions)
-                state.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 else -> EmptyState(actions.onPickMedia, modifier = Modifier.align(Alignment.Center))
             }
-            // The app was reopened while an export from earlier is still running.
-            val export = state.export
-            if (original == null && export != null) {
-                ExportProgressBar(export, actions.onCancelExport, modifier = Modifier.align(Alignment.BottomCenter))
-            }
+            // Opening the first file blocks the screen; slider re-renders don't (see ImagePreview).
+            IndeterminateLoadingIndicator(show = state.isLoading && original == null)
         }
     }
 }
@@ -187,55 +215,41 @@ fun EditorScreen(
 @Composable
 private fun EditorContent(state: EditorUiState, original: ImageBitmap, actions: EditorActions) {
     val video = state.video
+    val editable = !state.isExporting
     Column(modifier = Modifier.fillMaxSize()) {
         ImagePreview(
             original = original,
             rendered = state.rendered,
-            busy = state.isRendering || state.isLoading,
+            loading = state.isLoading,
             modifier = Modifier.weight(0.5f).fillMaxWidth(),
         )
-        StatusLine(state.faceCount, state.kind)
         Column(
             modifier = Modifier
                 .weight(0.5f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
+                .padding(top = Sizes.small),
+            // Gaps between the groups so each section reads as its own plate.
+            verticalArrangement = Arrangement.spacedBy(Sizes.small),
         ) {
-            if (video != null) {
-                VideoOptions(video, enabled = !state.isExporting, actions)
-            }
-            SwitchRow(
-                title = stringResource(R.string.option_scrub_metadata),
-                body = stringResource(R.string.option_scrub_metadata_body),
-                checked = state.scrubMetadata,
-                onCheckedChange = actions.onScrubMetadataChange,
-                enabled = !state.isExporting,
-            )
-            GlitchControls(
-                params = state.params,
-                onParamsChange = actions.onParamsChange,
-                showSpeechPulse = state.kind == MediaKind.VIDEO,
-                enabled = !state.isExporting,
-            )
-        }
-        val progress = state.export
-        if (progress != null) {
-            ExportProgressBar(progress, actions.onCancelExport)
-        } else {
-            BottomButtons(state, actions)
+            if (video != null) FrameScrubber(video, editable, actions)
+            GlitchSection(state.params, actions.onParamsChange, enabled = editable)
+            SmearSection(state.params, actions.onParamsChange, enabled = editable, showSpeechPulse = video != null)
+            if (video != null) AudioSection(video, editable, actions)
+            PrivacySection(state.scrubMetadata, editable, actions)
         }
     }
 }
 
+/** Picks which frame of the video to preview and tune the effect on. */
 @Composable
-private fun VideoOptions(video: VideoUiState, enabled: Boolean, actions: EditorActions) {
-    Column {
+private fun FrameScrubber(video: VideoUiState, enabled: Boolean, actions: EditorActions) {
+    Column(modifier = Modifier.padding(horizontal = Sizes.rowInset, vertical = Sizes.small)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(stringResource(R.string.video_preview_frame), style = MaterialTheme.typography.labelLarge)
+            SupraBodyTextMedium(text = stringResource(R.string.video_preview_frame))
             Text(
                 "${formatTime(video.previewPositionMs)} / ${formatTime(video.durationMs)}",
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = Ink5,
             )
         }
         Slider(
@@ -244,54 +258,220 @@ private fun VideoOptions(video: VideoUiState, enabled: Boolean, actions: EditorA
             onValueChangeFinished = actions.onPreviewPositionCommitted,
             valueRange = 0f..video.durationMs.coerceAtLeast(1L).toFloat(),
             enabled = enabled,
+            colors = SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.secondary,
+                activeTrackColor = MaterialTheme.colorScheme.secondary,
+                inactiveTrackColor = Ink4,
+            ),
         )
-        SwitchRow(
-            title = stringResource(R.string.video_remove_audio),
-            body = stringResource(R.string.video_remove_audio_body),
-            checked = video.removeAudio,
-            onCheckedChange = actions.onRemoveAudioChange,
-            enabled = enabled,
-        )
-        VoiceOptions(video, enabled, actions)
     }
 }
 
-/** Voice disguise: on/off, a style, and a short preview. Needs the audio to be kept. */
-@OptIn(ExperimentalLayoutApi::class)
+/** Remove the soundtrack, or keep it and disguise the voice. */
 @Composable
-private fun VoiceOptions(video: VideoUiState, enabled: Boolean, actions: EditorActions) {
-    val available = enabled && !video.removeAudio
-    SwitchRow(
-        title = stringResource(R.string.voice_title),
-        body = stringResource(if (video.removeAudio) R.string.voice_body_needs_audio else R.string.voice_body),
-        checked = video.voiceEnabled && !video.removeAudio,
-        onCheckedChange = actions.onVoiceEnabledChange,
-        enabled = available,
-    )
-    if (!video.voiceEnabled || video.removeAudio) return
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        VoiceStyle.entries.forEach { style ->
-            FilterChip(
-                selected = style == video.voiceStyle,
-                onClick = { actions.onVoiceStyleChange(style) },
-                label = { Text(stringResource(style.label)) },
+private fun AudioSection(video: VideoUiState, enabled: Boolean, actions: EditorActions) {
+    val voiceOn = video.voiceEnabled && !video.removeAudio
+    SupraCollapsibleArea(
+        title = stringResource(R.string.section_audio),
+        status = when {
+            video.removeAudio -> stringResource(R.string.status_muted)
+            voiceOn -> stringResource(video.voiceStyle.label)
+            else -> stringResource(R.string.status_original)
+        },
+    ) {
+        Column(modifier = Modifier.padding(horizontal = Sizes.rowInset)) {
+            SettingToggleRow(
+                label = stringResource(R.string.video_remove_audio),
+                checked = video.removeAudio,
+                onCheckedChange = actions.onRemoveAudioChange,
                 enabled = enabled,
+            )
+            Hint(stringResource(R.string.video_remove_audio_body))
+            SettingToggleRow(
+                label = stringResource(R.string.voice_title),
+                checked = voiceOn,
+                onCheckedChange = actions.onVoiceEnabledChange,
+                enabled = enabled && !video.removeAudio,
+            )
+            Hint(stringResource(if (video.removeAudio) R.string.voice_body_needs_audio else R.string.voice_body))
+            if (voiceOn) {
+                val labels = VoiceStyle.entries.map { stringResource(it.label) }
+                Spacer(Modifier.height(Sizes.medium))
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    SupraDropdownPicker(
+                        items = labels,
+                        selectedValue = stringResource(video.voiceStyle.label),
+                        width = maxWidth,
+                        onItemSelected = { label -> actions.onVoiceStyleChange(VoiceStyle.entries[labels.indexOf(label)]) },
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = Sizes.small),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Sizes.small),
+                ) {
+                    Hint(stringResource(video.voiceStyle.description), modifier = Modifier.weight(1f))
+                    SupraHardwareButton(
+                        text = stringResource(if (video.isPreviewingVoice) R.string.voice_stop_preview else R.string.voice_preview),
+                        tone = SupraButtonTone.NEUTRAL,
+                        enabled = enabled,
+                        onClick = actions.onToggleVoicePreview,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PrivacySection(scrubMetadata: Boolean, enabled: Boolean, actions: EditorActions) {
+    SupraCollapsibleArea(
+        title = stringResource(R.string.section_privacy),
+        status = stringResource(if (scrubMetadata) R.string.status_scrubbed else R.string.status_kept),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = Sizes.rowInset, vertical = Sizes.small)) {
+            SettingToggleRow(
+                label = stringResource(R.string.option_scrub_metadata),
+                checked = scrubMetadata,
+                onCheckedChange = actions.onScrubMetadataChange,
+                enabled = enabled,
+            )
+            Hint(stringResource(R.string.option_scrub_metadata_body))
+        }
+    }
+}
+
+/** One accent per screen: the committing action (Save or Export). Reshuffle is neutral. */
+@Composable
+private fun BottomButtons(state: EditorUiState, actions: EditorActions) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = Sizes.small),
+        horizontalArrangement = Arrangement.spacedBy(Sizes.small),
+    ) {
+        SupraHardwareButton(
+            modifier = Modifier.weight(1f),
+            text = stringResource(R.string.editor_reseed),
+            tone = SupraButtonTone.NEUTRAL,
+            fullWidth = true,
+            onClick = actions.onReseed,
+        )
+        if (state.kind == MediaKind.VIDEO) {
+            SupraHardwareButton(
+                modifier = Modifier.weight(1f),
+                text = stringResource(R.string.editor_export),
+                fullWidth = true,
+                enabled = state.canExport,
+                onClick = actions.onExportVideo,
+            )
+        } else {
+            SupraHardwareButton(
+                modifier = Modifier.weight(1f),
+                text = stringResource(R.string.editor_save),
+                fullWidth = true,
+                enabled = state.canSave,
+                onClick = actions.onSavePhoto,
             )
         }
     }
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            stringResource(video.voiceStyle.description),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f),
-        )
-        TextButton(onClick = actions.onToggleVoicePreview, enabled = enabled) {
-            Text(stringResource(if (video.isPreviewingVoice) R.string.voice_stop_preview else R.string.voice_preview))
+}
+
+@Composable
+private fun ExportProgressBar(progress: ExportProgress, onCancel: () -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Sizes.small, vertical = Sizes.medium)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                val fraction = progress.fraction
+                SupraBodyTextMedium(
+                    text = when {
+                        progress.stage == ExportStage.ANALYZING_AUDIO -> stringResource(R.string.video_analyzing_audio)
+                        fraction == null -> stringResource(R.string.video_exporting)
+                        else -> stringResource(R.string.video_exporting_percent, (fraction * 100).roundToInt())
+                    },
+                )
+                Hint(stringResource(R.string.video_export_hint))
+            }
+            SupraHardwareButton(
+                text = stringResource(R.string.editor_cancel),
+                tone = SupraButtonTone.DANGER,
+                onClick = onCancel,
+            )
         }
+        Spacer(Modifier.height(Sizes.small))
+        val fraction = progress.fraction
+        val barColor = MaterialTheme.colorScheme.secondary
+        if (fraction == null) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = barColor, trackColor = Ink4)
+        } else {
+            LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth(), color = barColor, trackColor = Ink4)
+        }
+    }
+}
+
+/** Shows the glitched image; pressing and holding swaps in the original for comparison. */
+@Composable
+private fun ImagePreview(
+    original: ImageBitmap,
+    rendered: ImageBitmap?,
+    loading: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    var showOriginal by remember { mutableStateOf(false) }
+    Box(
+        modifier = modifier.pointerInput(Unit) {
+            detectTapGestures(onPress = {
+                showOriginal = true
+                tryAwaitRelease()
+                showOriginal = false
+            })
+        },
+    ) {
+        Image(
+            bitmap = if (showOriginal || rendered == null) original else rendered,
+            contentDescription = stringResource(R.string.editor_preview_description),
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize(),
+        )
+        // Loading a new frame or photo covers the preview so stale content isn't mistaken for it.
+        IndeterminateLoadingIndicator(show = loading)
+    }
+}
+
+@Composable
+private fun StatusLine(faceCount: Int, kind: MediaKind?, modifier: Modifier = Modifier) {
+    val isVideo = kind == MediaKind.VIDEO
+    val text = when {
+        faceCount > 0 -> pluralStringResource(R.plurals.editor_face_count, faceCount, faceCount) +
+            " · " + stringResource(R.string.editor_hold_hint)
+        isVideo -> stringResource(R.string.editor_no_faces_in_frame)
+        else -> stringResource(R.string.editor_no_faces)
+    }
+    SupraBodyTextSmall(
+        text = text,
+        color = if (faceCount == 0 && !isVideo) MaterialTheme.colorScheme.error else Ink5,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun EmptyState(onPickMedia: () -> Unit, modifier: Modifier = Modifier) {
+    // Left-aligned display block, like Supra's own landing screens.
+    Column(
+        modifier = modifier.fillMaxWidth().padding(horizontal = Sizes.medium),
+        horizontalAlignment = Alignment.Start,
+    ) {
+        SupraDisplayBlock(text = stringResource(R.string.editor_empty_title))
+        Spacer(Modifier.height(Sizes.medium))
+        SupraBodyTextMedium(
+            text = stringResource(R.string.editor_empty_body),
+            color = Ink5,
+        )
+        Spacer(Modifier.height(Sizes.large))
+        // The text reads left-aligned, but the call to action sits centred.
+        SupraHardwareButton(
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+            text = stringResource(R.string.editor_choose_media),
+            onClick = onPickMedia,
+        )
     }
 }
 
@@ -311,169 +491,7 @@ private val VoiceStyle.description: Int
         VoiceStyle.CORRUPTED -> R.string.voice_corrupted_body
     }
 
-@Composable
-private fun SwitchRow(
-    title: String,
-    body: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    enabled: Boolean,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-            Text(title, style = MaterialTheme.typography.labelLarge)
-            Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
-    }
-}
-
-@Composable
-private fun BottomButtons(state: EditorUiState, actions: EditorActions) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        OutlinedButton(onClick = actions.onReseed, modifier = Modifier.weight(1f)) {
-            Text(stringResource(R.string.editor_reseed))
-        }
-        if (state.kind == MediaKind.VIDEO) {
-            Button(onClick = actions.onExportVideo, enabled = state.canExport, modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.editor_export))
-            }
-        } else {
-            Button(onClick = actions.onSavePhoto, enabled = state.canSave, modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.editor_save))
-            }
-        }
-    }
-}
-
-@Composable
-private fun ExportProgressBar(progress: ExportProgress, onCancel: () -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier = modifier.fillMaxWidth().padding(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                val fraction = progress.fraction
-                Text(
-                    text = if (progress.stage == ExportStage.ANALYZING_AUDIO) {
-                        stringResource(R.string.video_analyzing_audio)
-                    } else if (fraction == null) {
-                        stringResource(R.string.video_exporting)
-                    } else {
-                        stringResource(R.string.video_exporting_percent, (fraction * 100).roundToInt())
-                    },
-                    style = MaterialTheme.typography.labelLarge,
-                )
-                Text(
-                    stringResource(R.string.video_export_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            TextButton(onClick = onCancel) { Text(stringResource(R.string.editor_cancel)) }
-        }
-        Spacer(Modifier.height(8.dp))
-        val fraction = progress.fraction
-        if (fraction == null) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-        } else {
-            LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
-        }
-    }
-}
-
-/** Shows the glitched image; pressing and holding swaps in the original for comparison. */
-@Composable
-private fun ImagePreview(
-    original: ImageBitmap,
-    rendered: ImageBitmap?,
-    busy: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    var showOriginal by remember { mutableStateOf(false) }
-    Box(
-        modifier = modifier.pointerInput(Unit) {
-            detectTapGestures(onPress = {
-                showOriginal = true
-                tryAwaitRelease()
-                showOriginal = false
-            })
-        },
-    ) {
-        Image(
-            bitmap = if (showOriginal || rendered == null) original else rendered,
-            contentDescription = stringResource(R.string.editor_preview_description),
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize(),
-        )
-        if (busy) {
-            CircularProgressIndicator(
-                modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).size(24.dp),
-                strokeWidth = 3.dp,
-            )
-        }
-    }
-}
-
-@Composable
-private fun StatusLine(faceCount: Int, kind: MediaKind?) {
-    val isVideo = kind == MediaKind.VIDEO
-    val text = when {
-        faceCount > 0 -> pluralStringResource(R.plurals.editor_face_count, faceCount, faceCount) +
-            " · " + stringResource(R.string.editor_hold_hint)
-        isVideo -> stringResource(R.string.editor_no_faces_in_frame)
-        else -> stringResource(R.string.editor_no_faces)
-    }
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodySmall,
-        color = if (faceCount == 0 && !isVideo) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-    )
-}
-
-@Composable
-private fun EmptyState(onPickMedia: () -> Unit, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            stringResource(R.string.editor_empty_title),
-            style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            stringResource(R.string.editor_empty_body),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(24.dp))
-        Button(onClick = onPickMedia) { Text(stringResource(R.string.editor_choose_media)) }
-    }
-}
-
 private fun formatTime(ms: Long): String {
     val totalSeconds = ms / 1000
     return "%d:%02d".format(totalSeconds / 60, totalSeconds % 60)
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun EmptyEditorPreview() {
-    AnonymizerTheme {
-        Surface {
-            EditorScreen(
-                state = EditorUiState(),
-                snackbarHostState = remember { SnackbarHostState() },
-                actions = EditorActions(),
-            )
-        }
-    }
 }

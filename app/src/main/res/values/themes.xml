@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <style name="Theme.Anonymizer" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Dark window so launch matches Supra's Ink palette instead of flashing white. -->
+    <style name="Theme.Anonymizer" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#FF0B0D0E</item>
+    </style>
 </resources>

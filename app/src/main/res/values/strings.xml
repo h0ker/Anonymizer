@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">Anonymizer</string>
 
-    <string name="editor_empty_title">Glitch the faces in a photo or video</string>
+    <string name="editor_empty_title">PROTECT\nYOUR\nIDENTITY</string>
     <string name="editor_empty_body">Faces are found on your device. Nothing is uploaded.</string>
     <string name="editor_choose_media">Choose photo or video</string>
     <string name="editor_open">Open</string>
@@ -47,6 +47,19 @@
     <string name="notification_preparing">Preparing…</string>
     <string name="notification_percent">%d%%</string>
     <string name="notification_saved_title">Video saved</string>
+
+    <string name="section_glitch">Glitch</string>
+    <string name="section_smear">Smear &amp; colour</string>
+    <string name="section_audio">Audio</string>
+    <string name="section_privacy">Privacy</string>
+    <string name="setting_off">Off</string>
+    <string name="setting_on">On</string>
+    <string name="status_muted">Muted</string>
+    <string name="status_original">Original</string>
+    <string name="status_scrubbed">Scrubbed</string>
+    <string name="status_kept">Kept</string>
+    <string name="readout_faces">Faces %1$02d</string>
+    <string name="rail_stamp">Rev %1$s</string>
 
     <string name="control_angle">Angle</string>
     <string name="control_threshold">Sort brightness range</string>

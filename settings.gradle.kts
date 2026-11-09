@@ -19,6 +19,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Supra UI components are published from GitHub through JitPack.
+        maven { url = uri("https://jitpack.io") }
     }
 }
 

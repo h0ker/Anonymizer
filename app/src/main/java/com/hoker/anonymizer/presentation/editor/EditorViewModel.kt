@@ -23,6 +23,7 @@ import com.hoker.anonymizer.domain.usecase.ObserveVideoExportUseCase
 import com.hoker.anonymizer.domain.usecase.PreviewVoiceUseCase
 import com.hoker.anonymizer.domain.usecase.SaveImageUseCase
 import com.hoker.anonymizer.domain.usecase.StartVideoExportUseCase
+import com.hoker.supra.presentation.fx.SupraFX
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -57,6 +58,8 @@ class EditorViewModel @Inject constructor(
     private val cancelVideoExport: CancelVideoExportUseCase,
     private val observeVideoExport: ObserveVideoExportUseCase,
     private val previewVoice: PreviewVoiceUseCase,
+    /** Supra's screen-level feedback: snackbars, success/error sounds and haptics. */
+    val supraFX: SupraFX,
     @param:DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
@@ -77,6 +80,9 @@ class EditorViewModel @Inject constructor(
     private var voicePreviewJob: Job? = null
 
     init {
+        // Keep the content surface still: no gyroscope tilt while lining up a glitch. Supra stores this
+        // in its own preferences, so it also applies to any other Supra screen in the app.
+        supraFX.setGyroSettingState(false)
         observeRenders()
         observeExports()
     }
@@ -131,6 +137,7 @@ class EditorViewModel @Inject constructor(
                 faceCount = faces.size,
                 isLoading = false,
                 video = video ?: it.video.takeIf { kind == MediaKind.VIDEO },
+                mediaGeneration = if (video != null || kind == MediaKind.PHOTO) it.mediaGeneration + 1 else it.mediaGeneration,
             )
         }
         loaded.value = LoadedImage(image, faces, isVideoFrame = kind == MediaKind.VIDEO)

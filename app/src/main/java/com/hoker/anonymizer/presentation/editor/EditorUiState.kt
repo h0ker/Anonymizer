@@ -24,6 +24,8 @@ data class EditorUiState(
      * export outlives this screen: reopening the app mid-export still shows it.
      */
     val export: ExportProgress? = null,
+    /** Goes up each time a new photo or video is opened; the screen glitches on each change. */
+    val mediaGeneration: Int = 0,
 ) {
     val hasMedia: Boolean get() = original != null
     val isExporting: Boolean get() = export != null
