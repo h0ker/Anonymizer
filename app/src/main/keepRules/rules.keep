@@ -20,3 +20,10 @@
 -keepclassmembers class androidx.exifinterface.media.ExifInterface {
     public static final java.lang.String TAG_*;
 }
+
+# Kotlin compiles big utility files (CollectionsKt, StringsKt, FlowKt...) into a chain of package-private
+# "Kt__" classes that extend one another. R8's partial optimization was moving some links of that chain
+# to another package, so release builds crashed on launch with IllegalAccessError. Keeping their names
+# keeps every link in its own package; unused ones can still be removed.
+-keepnames class kotlin.**Kt__*
+-keepnames class kotlinx.**Kt__*
