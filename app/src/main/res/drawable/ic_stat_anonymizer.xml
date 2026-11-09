@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Notification icon: a head whose lower half dissolves into vertical streaks. White only, as Android requires. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,2C8.69,2 6,4.69 6,8v3h12V8C18,4.69 15.31,2 12,2z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M6,12h2v7H6zM9,12h1.5v10H9zM11.5,12H13v6h-1.5zM14,12h1.5v9H14zM16.5,12H18v5h-1.5z" />
+</vector>

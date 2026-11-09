@@ -1,0 +1,69 @@
+<resources>
+    <string name="app_name">Anonymizer</string>
+
+    <string name="editor_empty_title">Glitch the faces in a photo or video</string>
+    <string name="editor_empty_body">Faces are found on your device. Nothing is uploaded.</string>
+    <string name="editor_choose_media">Choose photo or video</string>
+    <string name="editor_open">Open</string>
+    <string name="editor_reseed">Reshuffle</string>
+    <string name="editor_save">Save</string>
+    <string name="editor_export">Export video</string>
+    <string name="editor_cancel">Cancel</string>
+    <string name="editor_preview_description">Preview of the glitched image. Press and hold to see the original.</string>
+    <string name="editor_hold_hint">Hold the image to compare with the original</string>
+    <string name="editor_no_faces">No faces found in this photo</string>
+    <string name="editor_no_faces_in_frame">No faces in this frame. Pick another frame to tune the look.</string>
+    <plurals name="editor_face_count">
+        <item quantity="one">%d face</item>
+        <item quantity="other">%d faces</item>
+    </plurals>
+
+    <string name="option_scrub_metadata">Scrub metadata</string>
+    <string name="option_scrub_metadata_body">Removes location, time and device details from the saved file</string>
+    <string name="video_preview_frame">Preview frame</string>
+    <string name="video_remove_audio">Remove audio</string>
+    <string name="video_remove_audio_body">Voices can identify people too</string>
+    <string name="voice_title">Disguise voice</string>
+    <string name="voice_body">Machine voice effect on the exported audio</string>
+    <string name="voice_body_needs_audio">Turn off Remove audio to use</string>
+    <string name="voice_preview">Preview</string>
+    <string name="voice_stop_preview">Stop</string>
+    <string name="voice_rogue_ai">Rogue AI</string>
+    <string name="voice_rogue_ai_body">Layered, metallic and menacing, with syllable stutters</string>
+    <string name="voice_synthetic">Synthetic</string>
+    <string name="voice_synthetic_body">Classic buzzing robot</string>
+    <string name="voice_low_machine">Low machine</string>
+    <string name="voice_low_machine_body">Deep, heavy and industrial</string>
+    <string name="voice_corrupted">Corrupted</string>
+    <string name="voice_corrupted_body">Bit-crushed and glitching, like a damaged transmission</string>
+    <string name="video_exporting">Exporting…</string>
+    <string name="video_exporting_percent">Exporting… %d%%</string>
+    <string name="video_export_hint">You can leave the app. Progress shows in your notifications.</string>
+    <string name="video_analyzing_audio">Analyzing audio…</string>
+
+    <string name="notification_channel_progress">Video export progress</string>
+    <string name="notification_channel_result">Finished exports</string>
+    <string name="notification_exporting_title">Exporting video</string>
+    <string name="notification_preparing">Preparing…</string>
+    <string name="notification_percent">%d%%</string>
+    <string name="notification_saved_title">Video saved</string>
+
+    <string name="control_angle">Angle</string>
+    <string name="control_threshold">Sort brightness range</string>
+    <string name="control_bleed">Bleed past face</string>
+    <string name="control_trail">Trail past face</string>
+    <string name="control_raggedness">Edge raggedness</string>
+    <string name="control_smear">Smear</string>
+    <string name="control_streak_length">Streak length</string>
+    <string name="control_tint">Tint</string>
+    <string name="control_speech_pulse">Speech pulse</string>
+    <string name="control_speech_pulse_hint">Flushes the glitch red in time with speech. The preview shows the peak.</string>
+
+    <string name="message_photo_saved">Saved to Pictures/Anonymizer</string>
+    <string name="message_video_saved">Saved to Movies/Anonymizer</string>
+    <string name="message_load_failed">Couldn\'t open that file</string>
+    <string name="message_save_failed">Couldn\'t save the photo</string>
+    <string name="message_export_failed">Couldn\'t export the video</string>
+    <string name="message_unsupported">Only photos and videos are supported</string>
+    <string name="message_no_audio">This video has no audio</string>
+</resources>
