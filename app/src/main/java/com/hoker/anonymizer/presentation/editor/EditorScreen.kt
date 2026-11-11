@@ -232,7 +232,7 @@ private fun EditorContent(state: EditorUiState, original: ImageBitmap, actions: 
             verticalArrangement = Arrangement.spacedBy(Sizes.small),
         ) {
             if (video != null) FrameScrubber(video, editable, actions)
-            GlitchSection(state.params, actions.onParamsChange, enabled = editable)
+            GlitchSection(state.params, actions.onParamsChange, enabled = editable, showShuffle = video != null)
             SmearSection(state.params, actions.onParamsChange, enabled = editable, showSpeechPulse = video != null)
             if (video != null) AudioSection(video, editable, actions)
             PrivacySection(state.scrubMetadata, editable, actions)

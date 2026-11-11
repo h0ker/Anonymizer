@@ -66,6 +66,12 @@
     <string name="control_bleed">Bleed past face</string>
     <string name="control_trail">Trail past face</string>
     <string name="control_raggedness">Edge raggedness</string>
+    <string name="control_face_lighting">Face lighting</string>
+    <string name="control_face_lighting_hint">Lights the streaks with the face\'s own light and shadow</string>
+    <string name="control_shuffle">Shuffle rate</string>
+    <string name="control_shuffle_static">Static</string>
+    <string name="control_shuffle_rate">%1$d/s</string>
+    <string name="control_shuffle_hint">How often the glitch pattern changes during the video. The preview shows one frame.</string>
     <string name="control_smear">Smear</string>
     <string name="control_streak_length">Streak length</string>
     <string name="control_tint">Tint</string>

@@ -29,6 +29,14 @@ data class GlitchParams(
     val tintHighlight: Int = 0xFFF7DCFF.toInt(),
     /** Videos only. 0 = off; up to 1 = how strongly the glitch flushes red while someone speaks. */
     val speechPulse: Float = 0f,
+    /**
+     * Videos only. How many times per second the glitch pattern reshuffles, so it moves like a
+     * glitch rather than sitting on the face like a sticker. 0 = static; at or above the video's
+     * frame rate it changes every frame.
+     */
+    val shufflesPerSecond: Float = 30f,
+    /** Light the streaks with the face's own (heavily blurred) light and shadow, so they don't look flat. */
+    val faceLighting: Boolean = false,
     /** Seed for the random parts of the effect, so a given result is reproducible. */
     val seed: Int = 1,
 )

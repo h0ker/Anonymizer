@@ -24,3 +24,21 @@ private fun channel(from: Int, to: Int, shift: Int, t: Float): Int {
     val e = (to shr shift) and 0xFF
     return (f + (e - f) * t + 0.5f).toInt().coerceIn(0, 255)
 }
+
+/**
+ * Multiplies the colour's brightness by [gain], keeping alpha and hue. Brightening stops when the
+ * strongest channel reaches full: letting one channel clip while the others keep rising would
+ * shift the colour (skin tones turn yellow-green).
+ */
+internal fun scaleColor(argb: Int, gain: Float): Int {
+    if (gain == 1f) return argb
+    val r = (argb shr 16) and 0xFF
+    val g = (argb shr 8) and 0xFF
+    val b = argb and 0xFF
+    val strongest = maxOf(r, g, b)
+    val safeGain = if (strongest == 0) 0f else gain.coerceIn(0f, 255f / strongest)
+    return (argb and 0xFF000000.toInt()) or
+        ((r * safeGain + 0.5f).toInt().coerceAtMost(255) shl 16) or
+        ((g * safeGain + 0.5f).toInt().coerceAtMost(255) shl 8) or
+        (b * safeGain + 0.5f).toInt().coerceAtMost(255)
+}

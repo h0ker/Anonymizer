@@ -1,8 +1,8 @@
 [versions]
 # App version: sets versionName and the APK/AAB file names (anonymizer-<version>-<buildType>).
-version = "0.9.1"
+version = "0.9.2"
 # Bump on every release; Google Play rejects a versionCode it has already seen.
-versionCode = "0091"
+versionCode = "0902"
 agp = "9.5.1"
 coreKtx = "1.19.1"
 junit = "4.13.2"

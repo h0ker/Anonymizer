@@ -39,6 +39,8 @@ fun GlitchSection(
     params: GlitchParams,
     onParamsChange: ((GlitchParams) -> GlitchParams) -> Unit,
     enabled: Boolean,
+    /** Shuffling only matters across frames, so it's only offered for videos. */
+    showShuffle: Boolean = false,
 ) {
     SupraCollapsibleArea(
         title = stringResource(R.string.section_glitch),
@@ -91,6 +93,25 @@ fun GlitchSection(
                 enabled = enabled,
                 onValueChange = { v -> onParamsChange { it.copy(raggedness = v) } },
             )
+            SettingToggleRow(
+                label = stringResource(R.string.control_face_lighting),
+                checked = params.faceLighting,
+                onCheckedChange = { on -> onParamsChange { it.copy(faceLighting = on) } },
+                enabled = enabled,
+            )
+            Hint(stringResource(R.string.control_face_lighting_hint))
+            if (showShuffle) {
+                LabeledSlider(
+                    label = stringResource(R.string.control_shuffle),
+                    valueText = if (params.shufflesPerSecond < 1f) stringResource(R.string.control_shuffle_static)
+                    else stringResource(R.string.control_shuffle_rate, params.shufflesPerSecond.roundToInt()),
+                    value = params.shufflesPerSecond,
+                    valueRange = 0f..60f,
+                    enabled = enabled,
+                    onValueChange = { v -> onParamsChange { it.copy(shufflesPerSecond = if (v < 1f) 0f else v) } },
+                )
+                Hint(stringResource(R.string.control_shuffle_hint))
+            }
         }
     }
 }
@@ -232,7 +253,7 @@ private fun Float.percent(): String = "${(this * 100).roundToInt()}%"
 private fun GlitchSectionsPreview() {
     AnonymizerTheme {
         Column {
-            GlitchSection(params = GlitchParams(), onParamsChange = {}, enabled = true)
+            GlitchSection(params = GlitchParams(), onParamsChange = {}, enabled = true, showShuffle = true)
             SmearSection(params = GlitchParams(), onParamsChange = {}, enabled = true, showSpeechPulse = true)
         }
     }

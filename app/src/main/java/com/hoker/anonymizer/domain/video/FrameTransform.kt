@@ -29,7 +29,18 @@ class FaceGlitchFrameTransform(
         val faces = tracker.update(detections, presentationTimeUs)
         if (faces.isEmpty()) return frame
         val speechLevel = speech?.at(presentationTimeUs) ?: 0f
-        return effect.apply(frame, faces, params, speechLevel)
+        return effect.apply(frame, faces, params, speechLevel, shuffleStep(presentationTimeUs, params.shufflesPerSecond))
+    }
+
+    companion object {
+        /**
+         * Which shuffle step a frame falls in: it changes [shufflesPerSecond] times a second, so
+         * frames within one step share a pattern. Based on time rather than frame count, so the
+         * rate is the same whatever the video's frame rate.
+         */
+        fun shuffleStep(presentationTimeUs: Long, shufflesPerSecond: Float): Int =
+            // Rounded, not floored: frame times sit a hair under exact multiples (33 333 µs at 30 fps).
+            if (shufflesPerSecond <= 0f) 0 else Math.round(presentationTimeUs * shufflesPerSecond.toDouble() / 1_000_000).toInt()
     }
 
     override fun close() = session.close()

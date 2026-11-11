@@ -23,8 +23,9 @@ import kotlin.random.Random
  *     features (eyes, mouth) that sorting alone would leave readable.
  *  3. **Sort:** consecutive pixels whose brightness is within the threshold range are sorted by
  *     brightness, which produces the classic pixel-sort gradients.
- *  4. **Tint:** an optional duotone colour grade.
- *  5. **Composite:** the result is blended over the original using the mask opacity.
+ *  4. **Face lighting** (optional): the face's own blurred light and shadow is put back over the streaks.
+ *  5. **Tint:** an optional duotone colour grade.
+ *  6. **Composite:** the result is blended over the original using the mask opacity.
  *
  * Pixels outside every face's reach are never written.
  */
@@ -33,6 +34,8 @@ class FaceGlitchEffect @Inject constructor() {
     /**
      * Returns a new image with every face glitched. [speechLevel] (0..1) is how loudly someone is
      * speaking right now; with [GlitchParams.speechPulse] on, it flushes the glitch red.
+     * [variation] rerolls the random pattern (video uses it to shuffle the glitch over time); the same
+     * value always gives the same result.
      * [checkCancelled] is called once per line so callers can abort long renders (it should throw).
      */
     fun apply(
@@ -40,18 +43,21 @@ class FaceGlitchEffect @Inject constructor() {
         faces: List<FaceRegion>,
         params: GlitchParams,
         speechLevel: Float = 0f,
+        variation: Int = 0,
         checkCancelled: () -> Unit = {},
     ): PixelBuffer {
         val output = image.copy()
         for (face in faces) {
             // Seed per face so one face's look doesn't change when another face is added.
-            renderFace(output, face, params, speechLevel, mix(params.seed, face.id), checkCancelled)
+            renderFace(output, image, face, params, speechLevel, mix(mix(params.seed, face.id), variation), checkCancelled)
         }
         return output
     }
 
+    /** Draws one face's glitch into [image]. [source] is the untouched input, for reading the face's real lighting. */
     private fun renderFace(
         image: PixelBuffer,
+        source: PixelBuffer,
         face: FaceRegion,
         params: GlitchParams,
         speechLevel: Float,
@@ -79,6 +85,7 @@ class FaceGlitchEffect @Inject constructor() {
         val maxLine = max(mask.width, mask.height) + 1
         val scratch = Scratch(maxLine)
         val settings = SegmentSettings.from(params, faceSize, trailPx, speechLevel)
+        val shading = if (params.faceLighting) FaceShading.build(source, face, maxReach) else null
 
         forEachLine(mask, params.angleDegrees, image.width, scratch.line) { lineIndex, count ->
             checkCancelled()
@@ -106,7 +113,7 @@ class FaceGlitchEffect @Inject constructor() {
                     val wanted = (settings.trailPx * (1f - raggedness * random.nextFloat())).toInt()
                     while (trailEnd < count && trailEnd - end < wanted && scratch.alpha[trailEnd] <= 0f) trailEnd++
                 }
-                processSegment(image.pixels, scratch, start, end, trailEnd, settings, random)
+                processSegment(image, scratch, start, end, trailEnd, settings, random, shading)
                 start = trailEnd
             }
         }
@@ -118,14 +125,16 @@ class FaceGlitchEffect @Inject constructor() {
      * where the face ends and slowly works back through the face's colours.
      */
     private fun processSegment(
-        pixels: IntArray,
+        image: PixelBuffer,
         scratch: Scratch,
         start: Int,
         end: Int,
         trailEnd: Int,
         settings: SegmentSettings,
         random: Random,
+        shading: FaceShading?,
     ) {
+        val pixels = image.pixels
         val faceLength = end - start
         val total = trailEnd - start
         val original = scratch.original
@@ -137,6 +146,14 @@ class FaceGlitchEffect @Inject constructor() {
 
         if (settings.smearChance > 0f) smear(original, colors, faceLength, settings, random)
         sortSpans(colors, scratch.keys, faceLength, settings)
+        if (shading != null) {
+            // Face lighting: put the real face's light and shadow back over the sorted pixels. Done
+            // before the trail is filled, so the trail carries the lit colours on.
+            for (k in 0 until faceLength) {
+                val pixel = scratch.line[start + k]
+                colors[k] = scaleColor(colors[k], shading.gainAt(pixel % image.width, pixel / image.width))
+            }
+        }
 
         val trailLength = total - faceLength
         if (trailLength > 0) {
